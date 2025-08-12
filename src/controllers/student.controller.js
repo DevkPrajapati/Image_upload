@@ -20,7 +20,7 @@ export const createStudent = catchAsync(async (req, res, next) => {
 
     const result = await cloudinary.uploader.upload(req.file.path, {
       folder: "uploads",
-    });    
+    });
 
     const students = await Student.create({
       firstName,
@@ -38,7 +38,7 @@ export const createStudent = catchAsync(async (req, res, next) => {
       students,
     });
   } catch (error) {
-     return next(error); 
+    return next(error);
   }
 });
 
@@ -54,11 +54,68 @@ export const getStudents = catchAsync(async (req, res, next) => {
     const students = await Student.find({});
 
     return res.status(200).json({
-      success : true,
-      message : 'Students get successfully..',
+      success: true,
+      message: 'Students get successfully..',
       students
     })
   } catch (error) {
-     return next(error); 
+    return next(error);
   }
 });
+
+
+export const updateStudents = catchAsync(async (req, res, next) => {
+  try {
+
+    const { id } = req.params;
+
+    const { firstName, lastName, age, gender } = req.body;
+
+    const student = await Student.findById(id);
+
+    if (!student) {
+      throw new ErrorHandler('Students Not Founds.', 404);
+    }
+
+    const { error } = studentSchema.fork(
+      ["firstname", "lastname", "age", "gender"],
+      (schema) => schema.optional()
+    ).validate(req.body);
+
+    if (error) {
+      return res.status(400).json({ success: false, message: error.details[0].message });
+    }
+
+    student.firstName = firstName;
+    student.lastName = lastName;
+    student.age = age;
+    student.gender = gender;
+
+    if (req.file) {
+      if (student.image) {
+        const public_id = student.image.split('/').pop().split('.')[0];
+        await cloudinary.uploader.destroy(`student/${public_id}`)
+      }
+
+
+      const updateImage = await cloudinary.uploader.upload(req.file.path, {
+        folder: 'uploads'
+      })
+
+      student.image = updateImage.secure_url
+    }
+
+
+    await student.save();
+
+    return res.status(200).json({
+      success: true,
+      message: "Students Updated Successfully..",
+      student,
+    });
+
+  } catch (error) {
+    return next(error);
+
+  }
+})
